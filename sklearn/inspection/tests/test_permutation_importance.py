@@ -257,6 +257,26 @@ def test_permutation_importance_polars_preserves_feature_names():
     assert result.importances.shape == (X.shape[1], 1)
 
 
+def test_permutation_importance_polars_column_transformer():
+    pl = pytest.importorskip("polars")
+
+    X, y = make_classification(n_samples=100, n_features=5, random_state=42)
+    feature_names = [f"feature_{i}" for i in range(X.shape[1])]
+    X = pl.DataFrame(X, schema=feature_names)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+
+    preprocess = ColumnTransformer(
+        [("scale", StandardScaler(), feature_names[:2])], remainder="passthrough"
+    )
+    clf = make_pipeline(preprocess, LogisticRegression()).fit(X_train, y_train)
+
+    result = permutation_importance(
+        clf, X_test, y_test, n_repeats=1, random_state=0
+    )
+
+    assert result.importances.shape == (X.shape[1], 1)
+
+
 def test_permutation_importance_linear_regression():
     X, y = make_regression(n_samples=500, n_features=10, random_state=0)
 

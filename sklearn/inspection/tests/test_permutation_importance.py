@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 from joblib import parallel_backend
@@ -238,6 +240,21 @@ def test_permutation_importance_mixed_types_pandas():
     # the correlated feature with y is the last column and should
     # have the highest importance
     assert np.all(result.importances_mean[-1] > result.importances_mean[:-1])
+
+
+def test_permutation_importance_polars_preserves_feature_names():
+    pl = pytest.importorskip("polars")
+
+    X, y = make_classification(random_state=0)
+    X = pl.DataFrame(X, schema=[f"col{i}" for i in range(X.shape[1])])
+
+    clf = LogisticRegression(max_iter=1000).fit(X, y)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        result = permutation_importance(clf, X, y, n_repeats=1, random_state=0)
+
+    assert result.importances.shape == (X.shape[1], 1)
 
 
 def test_permutation_importance_linear_regression():

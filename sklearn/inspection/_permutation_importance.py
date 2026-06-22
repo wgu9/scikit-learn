@@ -11,6 +11,7 @@ from sklearn.ensemble._bagging import _generate_indices
 from sklearn.metrics import check_scoring, get_scorer_names
 from sklearn.model_selection._validation import _aggregate_score_dicts
 from sklearn.utils import Bunch, _safe_indexing, check_array, check_random_state
+from sklearn.utils._dataframe import is_polars_df
 from sklearn.utils._param_validation import (
     HasMethods,
     Integral,
@@ -60,7 +61,7 @@ def _calculate_permutation_scores(
         if sample_weight is not None:
             sample_weight = _safe_indexing(sample_weight, row_indices, axis=0)
     else:
-        X_permuted = X.copy()
+        X_permuted = X.clone() if is_polars_df(X) else X.copy()
 
     scores = []
     shuffling_idx = np.arange(X_permuted.shape[0])
@@ -70,6 +71,11 @@ def _calculate_permutation_scores(
             col = X_permuted.iloc[shuffling_idx, col_idx]
             col.index = X_permuted.index
             X_permuted[X_permuted.columns[col_idx]] = col
+        elif is_polars_df(X_permuted):
+            col_name = X_permuted.columns[col_idx]
+            X_permuted = X_permuted.with_columns(
+                X_permuted[:, col_idx][shuffling_idx].alias(col_name)
+            )
         else:
             X_permuted[:, col_idx] = X_permuted[shuffling_idx, col_idx]
         scores.append(_weights_scorer(scorer, estimator, X_permuted, y, sample_weight))
@@ -266,7 +272,7 @@ def permutation_importance(
     >>> result.importances_std
     array([0.2211, 0.       , 0.       ])
     """
-    if not hasattr(X, "iloc"):
+    if not (hasattr(X, "iloc") or is_polars_df(X)):
         X = check_array(X, ensure_all_finite="allow-nan", dtype=None)
 
     # Precompute random seed from the random state to be used

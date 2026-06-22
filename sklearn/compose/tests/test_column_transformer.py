@@ -506,6 +506,26 @@ def test_column_transformer_sparse_array(csr_container):
         assert_allclose_dense_sparse(ct.fit(X_sparse).transform(X_sparse), X_res_both)
 
 
+@pytest.mark.parametrize(
+    "sparse_container",
+    [
+        sparse.bsr_array,
+        sparse.bsr_matrix,
+        sparse.coo_array,
+        sparse.coo_matrix,
+        sparse.dia_array,
+        sparse.dia_matrix,
+    ],
+)
+def test_column_transformer_unsupported_sparse_format(sparse_container):
+    X_sparse = sparse_container(_sparse_eye_array(3, 2))
+    expected = X_sparse.tocsr()[:, [0]]
+    ct = ColumnTransformer([("trans", Trans(), [0])], sparse_threshold=0.8)
+
+    assert_allclose_dense_sparse(ct.fit_transform(X_sparse), expected)
+    assert_allclose_dense_sparse(ct.fit(X_sparse).transform(X_sparse), expected)
+
+
 def test_column_transformer_list():
     X_list = [[1, float("nan"), "a"], [0, 0, "b"]]
     expected_result = np.array(
